@@ -137,6 +137,12 @@ def main():
         print("\n".join(errors)); sys.exit(1)
 
     global_tbl = table.pop("*", {})
+    # “文件路径!force” 段中的译文即使出现在比较/匹配位置也强制替换（用于确认安全的情况）
+    forced = {}
+    for scope in [k for k in table if k.endswith("!force")]:
+        forced[scope[:-len("!force")]] = table.pop(scope)
+    for f, entries in forced.items():
+        table.setdefault(f, {}).update(entries)
     files = set(table)
     for gr in GLOBAL_ROOTS:
         for dp, _, fns in os.walk(os.path.join(root, gr)):
@@ -172,7 +178,7 @@ def main():
                 zh = global_tbl[raw]
             else:
                 continue
-            if raw in unsafe:
+            if raw in unsafe and raw not in forced.get(rel, {}):
                 skipped.add((rel, raw))
                 (used[rel] if raw in local else used_global).add(raw)
                 continue
