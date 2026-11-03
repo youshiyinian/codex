@@ -78,6 +78,9 @@ jobs:
       CARGO_INCREMENTAL: "0"
       LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC
       PYTHONUTF8: "1"
+      # rusty_v8 依赖里有很深的路径，默认位置会超出 Windows 260 字符限制
+      CARGO_HOME: C:/c
+      CARGO_TARGET_DIR: C:/t
       PYTHONIOENCODING: utf-8
     steps:
       - name: 拉取官方源码
@@ -99,6 +102,13 @@ jobs:
           set -euo pipefail
           python zh/i18n/apply.py . | tee apply-report.txt
           git diff --stat | tail -1
+
+      - name: 启用长路径支持
+        shell: pwsh
+        run: |
+          New-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force | Out-Null
+          git config --system core.longpaths true
+          New-Item -ItemType Directory -Force C:\c, C:\t | Out-Null
 
       - name: 安装 Rust 工具链
         shell: bash
@@ -165,7 +175,7 @@ jobs:
       - name: 打包
         shell: pwsh
         run: |
-          $exe = "codex-rs/target/$env:TARGET/release/codex.exe"
+          $exe = "$env:CARGO_TARGET_DIR/$env:TARGET/release/codex.exe"
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path $exe -DestinationPath "dist/codex-zh-$env:TARGET.zip" -CompressionLevel Optimal
           $ver = $env:UPSTREAM_TAG -replace '^rust-v', ''
