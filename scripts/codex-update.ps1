@@ -25,7 +25,7 @@ $ProgressPreference = "SilentlyContinue"
 
 function Find-CodexExe {
     $npmRoot = (& npm root -g).Trim()
-    $base = Join-Path $npmRoot "@openai\codex"
+    $base = Join-Path $npmRoot "@openai"
     if (-not (Test-Path $base)) { return $null }
     Get-ChildItem -Path $base -Recurse -Filter codex.exe -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -match 'vendor\\x86_64-pc-windows-msvc\\bin\\codex\.exe$' } |
