@@ -141,7 +141,26 @@ jobs:
           set -euo pipefail
           cd codex-rs
           export STABLE_GIT_COMMIT="$(git rev-parse HEAD)"
-          cargo build --target "$TARGET" --release --bin codex
+          set +e
+          cargo build --target "$TARGET" --release --bin codex 2>&1 | tee ../build.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [[ $code -ne 0 ]]; then
+            # 把关键错误写成注解，方便在没有日志权限时排查
+            python - <<'PY'
+          import re
+          lines = open("../build.log", encoding="utf-8", errors="replace").read().splitlines()
+          idx = [i for i, l in enumerate(lines) if re.match(r"\s*(error|warning: build failed|thread '.*' panicked)", l)]
+          chunks = []
+          for i in idx[:8]:
+              chunks.append("\n".join(lines[max(0, i - 2): i + 25]))
+          if not chunks:
+              chunks.append("\n".join(lines[-60:]))
+          for c in chunks:
+              print("::error title=cargo build::" + c.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
+          PY
+            exit $code
+          fi
 
       - name: 打包
         shell: pwsh
