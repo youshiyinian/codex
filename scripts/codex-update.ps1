@@ -32,6 +32,12 @@ function Find-CodexExe {
         Select-Object -First 1 -ExpandProperty FullName
 }
 
+function Get-RemoteText([string]$Url) {
+    $content = (Invoke-WebRequest -Headers @{ "User-Agent" = "codex-zh-updater" } -Uri $Url).Content
+    if ($content -is [byte[]]) { $content = [Text.Encoding]::UTF8.GetString($content) }
+    return ([string]$content).Trim()
+}
+
 function Get-InstalledNpmVersion {
     $json = & npm ls -g @openai/codex --depth=0 --json 2>$null | Out-String
     try { return ($json | ConvertFrom-Json).dependencies.'@openai/codex'.version } catch { return $null }
@@ -40,8 +46,7 @@ function Get-InstalledNpmVersion {
 function Assert-CodexNotRunning {
     $procs = Get-Process -Name codex -ErrorAction SilentlyContinue
     if ($procs) {
-        Write-Host "检测到 Codex 正在运行，请先退出所有 Codex 窗口后再试。" -ForegroundColor Yellow
-        exit 1
+        throw "检测到 Codex 正在运行，请先退出所有 Codex 窗口后再试。"
     }
 }
 
@@ -61,7 +66,7 @@ if ($Restore) {
         & npm install -g @openai/codex
         Write-Host "已重新安装官方英文版。" -ForegroundColor Green
     }
-    exit 0
+    return
 }
 
 Write-Host "正在获取最新汉化版信息..."
@@ -72,7 +77,7 @@ $verAsset = $release.assets | Where-Object { $_.name -eq "version.txt" }
 $shaAsset = $release.assets | Where-Object { $_.name -eq "sha256.txt" }
 if (-not $zipAsset -or -not $verAsset) { throw "Release $($release.tag_name) 缺少安装文件。" }
 
-$version = (Invoke-RestMethod -Headers $headers $verAsset.browser_download_url).ToString().Trim()
+$version = Get-RemoteText $verAsset.browser_download_url
 Write-Host "最新汉化版对应官方版本：$version"
 
 $stateDir = Join-Path $env:LOCALAPPDATA "codex-zh"
@@ -85,7 +90,7 @@ $stamp = if (Test-Path $stateFile) { (Get-Content $stateFile -Raw).Trim() } else
 $wanted = "$($release.tag_name)|$($zipAsset.updated_at)"
 if (-not $Force -and $installed -eq $version -and $exe -and $stamp -eq "$wanted|$((Get-Item $exe).Length)") {
     Write-Host "已经是最新汉化版（$version），无需更新。" -ForegroundColor Green
-    exit 0
+    return
 }
 
 if ($installed -ne $version -or -not $exe) {
@@ -106,7 +111,7 @@ try {
     Write-Host "正在下载汉化版 codex.exe..."
     Invoke-WebRequest -Headers $headers -Uri $zipAsset.browser_download_url -OutFile $zip
     if ($shaAsset) {
-        $expected = (Invoke-RestMethod -Headers $headers $shaAsset.browser_download_url).ToString().Trim()
+        $expected = Get-RemoteText $shaAsset.browser_download_url
         $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
         if ($expected -ne $actual) { throw "下载文件校验失败（SHA256 不一致），已中止。" }
     }

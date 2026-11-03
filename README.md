@@ -12,7 +12,7 @@
 前提：已安装 Node.js（带 npm）。在 PowerShell 7 中运行：
 
 ```powershell
-irm https://raw.githubusercontent.com/youshiyinian/codex/zh-cn/scripts/codex-update.ps1 | iex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/youshiyinian/codex/zh-cn/scripts/codex-update.ps1)))
 ```
 
 脚本会：
