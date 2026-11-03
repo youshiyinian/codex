@@ -1,0 +1,173 @@
+name: 编译汉化版 Codex（Windows）
+
+on:
+  schedule:
+    # 每 6 小时检查一次官方是否发布了新版本
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要编译的官方版本标签（如 rust-v0.166.0），留空表示最新正式版"
+        required: false
+        default: ""
+      force:
+        description: "即使已经编译过也重新编译"
+        type: boolean
+        default: false
+  push:
+    branches: [zh-cn]
+    paths:
+      - "i18n/**"
+      - ".github/workflows/build-zh.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-zh
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_tag: ${{ steps.pick.outputs.upstream_tag }}
+      release_tag: ${{ steps.pick.outputs.release_tag }}
+      build: ${{ steps.pick.outputs.build }}
+    steps:
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          FORCE: ${{ inputs.force }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            tag="$INPUT_TAG"
+          else
+            # 官方最新正式版（跳过 alpha/beta 预发布）
+            tag="$(gh api repos/openai/codex/releases/latest --jq .tag_name)"
+          fi
+          release_tag="zh-${tag}"
+          build=true
+          if [[ "$EVENT" == "schedule" ]] && gh release view "$release_tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            build=false
+          fi
+          if [[ "$EVENT" == "workflow_dispatch" && "${FORCE:-false}" != "true" ]] \
+             && gh release view "$release_tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            build=false
+          fi
+          echo "官方版本: $tag  发布标签: $release_tag  需要编译: $build"
+          {
+            echo "upstream_tag=$tag"
+            echo "release_tag=$release_tag"
+            echo "build=$build"
+          } >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 300
+    env:
+      UPSTREAM_TAG: ${{ needs.check.outputs.upstream_tag }}
+      RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
+      TARGET: x86_64-pc-windows-msvc
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      CARGO_INCREMENTAL: "0"
+      LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC
+    steps:
+      - name: 拉取官方源码
+        uses: actions/checkout@v4
+        with:
+          repository: openai/codex
+          ref: ${{ needs.check.outputs.upstream_tag }}
+          persist-credentials: false
+
+      - name: 拉取汉化文件
+        uses: actions/checkout@v4
+        with:
+          ref: zh-cn
+          path: zh
+
+      - name: 应用中文翻译
+        shell: bash
+        run: |
+          set -euo pipefail
+          python zh/i18n/apply.py . | tee apply-report.txt
+          git diff --stat | tail -1
+
+      - name: 安装 Rust 工具链
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd codex-rs
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add "$TARGET"
+
+      - name: 准备 python3 命令
+        shell: bash
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            mkdir -p "$HOME/shim"
+            printf '#!/bin/sh\nexec python "$@"\n' > "$HOME/shim/python3"
+            chmod +x "$HOME/shim/python3"
+            echo "$HOME/shim" >> "$GITHUB_PATH"
+          fi
+
+      - name: 下载 rusty_v8 预编译库
+        uses: ./.github/actions/setup-rusty-v8
+        with:
+          target: x86_64-pc-windows-msvc
+
+      - name: 配置 MSVC 环境
+        uses: ./.github/actions/setup-msvc-env
+        with:
+          target: x86_64-pc-windows-msvc
+
+      - name: 缓存编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: codex-rs
+          shared-key: codex-zh-windows
+          cache-on-failure: true
+
+      - name: 编译 codex.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd codex-rs
+          export STABLE_GIT_COMMIT="$(git rev-parse HEAD)"
+          cargo build --target "$TARGET" --release --bin codex
+
+      - name: 打包
+        shell: pwsh
+        run: |
+          $exe = "codex-rs/target/$env:TARGET/release/codex.exe"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path $exe -DestinationPath "dist/codex-zh-$env:TARGET.zip" -CompressionLevel Optimal
+          $ver = $env:UPSTREAM_TAG -replace '^rust-v', ''
+          Set-Content -Path dist/version.txt -Value $ver -NoNewline
+          (Get-FileHash "dist/codex-zh-$env:TARGET.zip" -Algorithm SHA256).Hash | Set-Content dist/sha256.txt -NoNewline
+          Get-ChildItem dist
+
+      - name: 发布 Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver="${UPSTREAM_TAG#rust-v}"
+          stale="$(grep -c '^警告' apply-report.txt || true)"
+          {
+            echo "基于官方 Codex CLI **${ver}**（[${UPSTREAM_TAG}](https://github.com/openai/codex/releases/tag/${UPSTREAM_TAG})）编译的简体中文界面版，仅包含 Windows x64 的 codex.exe。"
+            echo
+            echo "安装/更新：在 PowerShell 中运行 \`codex-update\`（见仓库 README）。"
+            echo
+            echo "$(tail -1 apply-report.txt)；其中 ${stale} 条译文在此版本中未找到原文（官方改了文字），这些地方会显示英文。"
+          } > notes.md
+          gh release delete "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --target zh-cn \
+            --title "Codex 汉化版 ${ver}" --notes-file notes.md --latest \
+            dist/codex-zh-${TARGET}.zip dist/version.txt dist/sha256.txt apply-report.txt
