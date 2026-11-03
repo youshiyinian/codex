@@ -77,6 +77,8 @@ jobs:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
       CARGO_INCREMENTAL: "0"
       LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
     steps:
       - name: 拉取官方源码
         uses: actions/checkout@v4

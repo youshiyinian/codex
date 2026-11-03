@@ -112,6 +112,12 @@ def find_literals(src):
 
 
 def main():
+    # Windows 控制台默认编码不是 UTF-8，打印中文会报错
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     if len(sys.argv) < 2:
         print(__doc__); sys.exit(2)
     root = sys.argv[1]
