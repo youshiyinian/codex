@@ -43,10 +43,12 @@ function Get-InstalledNpmVersion {
     try { return ($json | ConvertFrom-Json).dependencies.'@openai/codex'.version } catch { return $null }
 }
 
-function Assert-CodexNotRunning {
-    $procs = Get-Process -Name codex -ErrorAction SilentlyContinue
+function Assert-CodexNotRunning([string]$Target) {
+    if (-not $Target) { return }
+    $procs = Get-Process -Name codex -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and ($_.Path -ieq $Target) }
     if ($procs) {
-        throw "检测到 Codex 正在运行，请先退出所有 Codex 窗口后再试。"
+        throw "检测到汉化版要替换的 Codex 正在运行，请先退出所有 Codex 窗口后再试。"
     }
 }
 
@@ -54,11 +56,10 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     throw "未找到 npm，请先安装 Node.js（https://nodejs.org）。"
 }
 
-Assert-CodexNotRunning
-
 if ($Restore) {
     $exe = Find-CodexExe
     if (-not $exe) { throw "未找到通过 npm 安装的 Codex。" }
+    Assert-CodexNotRunning $exe
     if (Test-Path "$exe.official") {
         Copy-Item "$exe.official" $exe -Force
         Write-Host "已恢复官方英文版。" -ForegroundColor Green
@@ -88,39 +89,42 @@ $installed = Get-InstalledNpmVersion
 $exe = Find-CodexExe
 $stamp = if (Test-Path $stateFile) { (Get-Content $stateFile -Raw).Trim() } else { "" }
 $wanted = "$($release.tag_name)|$($zipAsset.updated_at)"
+$skipDownload = $false
 if (-not $Force -and $installed -eq $version -and $exe -and $stamp -eq "$wanted|$((Get-Item $exe).Length)") {
-    Write-Host "已经是最新汉化版（$version），无需更新。" -ForegroundColor Green
-    return
+    Write-Host "已经是最新汉化版（$version），无需重新下载。" -ForegroundColor Green
+    $skipDownload = $true
 }
 
-if ($installed -ne $version -or -not $exe) {
-    Write-Host "正在用 npm 安装官方 @openai/codex@$version（下载较大，请稍候）..."
-    & npm install -g "@openai/codex@$version"
-    if ($LASTEXITCODE -ne 0) { throw "npm 安装失败。" }
-    $exe = Find-CodexExe
-    if (-not $exe) { throw "安装后仍未找到 codex.exe。" }
-    Copy-Item $exe "$exe.official" -Force
-} elseif (-not (Test-Path "$exe.official")) {
-    Copy-Item $exe "$exe.official" -Force
-}
-
-$tmp = Join-Path $env:TEMP "codex-zh-$([guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Force $tmp | Out-Null
-try {
-    $zip = Join-Path $tmp "codex-zh.zip"
-    Write-Host "正在下载汉化版 codex.exe..."
-    Invoke-WebRequest -Headers $headers -Uri $zipAsset.browser_download_url -OutFile $zip
-    if ($shaAsset) {
-        $expected = Get-RemoteText $shaAsset.browser_download_url
-        $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
-        if ($expected -ne $actual) { throw "下载文件校验失败（SHA256 不一致），已中止。" }
+if (-not $skipDownload) {
+    if ($installed -ne $version -or -not $exe) {
+        Write-Host "正在用 npm 安装官方 @openai/codex@$version（下载较大，请稍候）..."
+        & npm install -g "@openai/codex@$version"
+        if ($LASTEXITCODE -ne 0) { throw "npm 安装失败。" }
+        $exe = Find-CodexExe
+        if (-not $exe) { throw "安装后仍未找到 codex.exe。" }
+        Copy-Item $exe "$exe.official" -Force
+    } elseif (-not (Test-Path "$exe.official")) {
+        Copy-Item $exe "$exe.official" -Force
     }
-    Expand-Archive -Path $zip -DestinationPath $tmp -Force
-    Assert-CodexNotRunning
-    Copy-Item (Join-Path $tmp "codex.exe") $exe -Force
-    Set-Content -Path $stateFile -Value "$wanted|$((Get-Item $exe).Length)" -NoNewline
-} finally {
-    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+
+    $tmp = Join-Path $env:TEMP "codex-zh-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    try {
+        $zip = Join-Path $tmp "codex-zh.zip"
+        Write-Host "正在下载汉化版 codex.exe..."
+        Invoke-WebRequest -Headers $headers -Uri $zipAsset.browser_download_url -OutFile $zip
+        if ($shaAsset) {
+            $expected = Get-RemoteText $shaAsset.browser_download_url
+            $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
+            if ($expected -ne $actual) { throw "下载文件校验失败（SHA256 不一致），已中止。" }
+        }
+        Expand-Archive -Path $zip -DestinationPath $tmp -Force
+        Assert-CodexNotRunning $exe
+        Copy-Item (Join-Path $tmp "codex.exe") $exe -Force
+        Set-Content -Path $stateFile -Value "$wanted|$((Get-Item $exe).Length)" -NoNewline
+    } finally {
+        Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    }
 }
 
 # 把本脚本保存到本地，并在 PowerShell 配置中注册 codex-update 命令
@@ -135,6 +139,19 @@ if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Force $PROFILE | Out-N
 if (-not (Select-String -Path $PROFILE -SimpleMatch "codex-update.ps1" -Quiet)) {
     Add-Content -Path $PROFILE -Value "`n# Codex 汉化版更新命令`n$profileLine"
     Write-Host "已在 PowerShell 配置中添加 codex-update 命令（新开窗口后可用）。"
+}
+
+# 确保 codex 命令指向 npm 安装的汉化版（而不是官方独立安装版等其他 codex.exe）
+$npmPrefix = (& npm prefix -g).Trim().TrimEnd('\')
+$resolved = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $resolved -or -not $resolved.Source.StartsWith($npmPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $parts = @($userPath -split ';' | Where-Object { $_ -and ($_.TrimEnd('\') -ne $npmPrefix) })
+    [Environment]::SetEnvironmentVariable("Path", ((@($npmPrefix) + $parts) -join ';'), "User")
+    $env:Path = "$npmPrefix;$env:Path"
+    $from = if ($resolved) { $resolved.Source } else { "（未找到）" }
+    Write-Host "codex 命令原先指向 $from，不是汉化版。" -ForegroundColor Yellow
+    Write-Host "已把 $npmPrefix 放到用户 PATH 最前面，请关闭并重新打开终端后再运行 codex。" -ForegroundColor Yellow
 }
 
 Write-Host "完成！Codex 汉化版 $version 已安装，运行 codex 即可使用。" -ForegroundColor Green
