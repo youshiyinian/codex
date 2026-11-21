@@ -55,7 +55,7 @@
   "codex-rs/tui/src/bottom_pane/app_link_view.rs": {
     "Sign in to this app in your browser, then return here.": "请在浏览器中登录此应用，然后回到这里。",
     "Action required": "需要操作",
-    "Server: {server_name}": "服务器：{server_name}",
+    "Server: {}": "服务器：{}",
     "Complete the requested action in your browser, then return here.": "请在浏览器中完成所需操作，然后回到这里。",
     "Open sign-in URL": "打开登录链接",
     "Back": "返回",

@@ -48,7 +48,6 @@
   "codex-rs/tui/src/app/session_lifecycle.rs": {
     "No agents available yet.": "暂无可用的智能体。",
     "Subagents": "子智能体",
-    "Agent thread {thread_id} is not yet available for replay or live attach.": "智能体线程 {thread_id} 暂时无法回放或实时连接。",
     "Finish Windows sandbox setup before switching threads.": "请先完成 Windows 沙箱设置再切换线程。",
     "Agent thread {thread_id} is no longer available.": "智能体线程 {thread_id} 已不可用。",
     "Failed to attach to agent thread {thread_id}: {err}": "无法连接到智能体线程 {thread_id}：{err}",
@@ -60,7 +59,9 @@
     "Failed to name the new session: {err}": "无法为新会话命名：{err}",
     "Failed to attach to fresh app-server thread: {err}": "无法连接到新线程：{err}",
     "Failed to start a fresh session through the app server: {err}": "无法启动新会话：{err}",
-    "This session belongs to a different backend. Open the session picker again.": "此会话属于其他后端，请重新打开会话列表。",
-    "Failed to attach to resumed app-server thread: {err}": "无法连接到恢复的线程：{err}"
+    "This session belongs to a different backend. Open the session picker again.": "此会话属于其他后端，请重新打开会话列表。"
+  },
+  "codex-rs/tui/src/app/thread_attachment.rs": {
+    "Agent thread {thread_id} is not yet available for replay or live attach.": "智能体线程 {thread_id} 暂时无法回放或实时连接。"
   }
 }

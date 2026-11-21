@@ -46,7 +46,8 @@
     "Disconnected from this task. The current turn was stopped.": "已断开与此任务的连接，当前回合已停止。",
     "To reconnect, run:": "如需重新连接，请运行：",
     "Stop the current turn: run {}, select this task, and {}.": "停止当前回合：运行 {}，选中此任务，然后{}。",
-    "Session archived: {thread_id}": "会话已归档：{thread_id}",
+    "Failed to archive thread {thread_id}: {error}": "归档线程 {thread_id} 失败：{error}",
+    "Archive of thread {thread_id} was not confirmed.": "未确认线程 {thread_id} 是否已归档。",
     "To continue this session, run:": "如需继续此会话，请运行：",
     "Or run {} and select {}.": "或运行 {} 并选择 {}。",
     "Session ID: {thread_id}": "会话 ID：{thread_id}"

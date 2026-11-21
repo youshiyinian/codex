@@ -157,7 +157,6 @@
     "Raw output mode off: rich transcript rendering restored.": "原始输出模式已关闭：已恢复富文本显示。",
     "Vim mode enabled.": "已启用 Vim 模式。",
     "Vim mode disabled.": "已禁用 Vim 模式。",
-    "This thread is open elsewhere. Close it there and retry resume to continue.": "此线程已在别处打开。请先在那里关闭，再重新恢复。",
     "Ask Codex to do anything": "让 Codex 帮你做任何事",
     "Ask a follow-up question": "继续追问"
   }
