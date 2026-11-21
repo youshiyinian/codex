@@ -76,6 +76,9 @@ jobs:
       TARGET: x86_64-pc-windows-msvc
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
       CARGO_INCREMENTAL: "0"
+      # 发布包只包含 exe，禁用调试信息和 LTO 以减少编译期间的磁盘占用。
+      CARGO_PROFILE_RELEASE_DEBUG: "0"
+      CARGO_PROFILE_RELEASE_LTO: "off"
       LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC
       PYTHONUTF8: "1"
       # rusty_v8 依赖里有很深的路径，默认位置会超出 Windows 260 字符限制
@@ -138,12 +141,12 @@ jobs:
         with:
           target: x86_64-pc-windows-msvc
 
-      - name: 缓存编译产物
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: codex-rs
-          shared-key: codex-zh-windows
-          cache-on-failure: true
+      # 不恢复旧的编译缓存，给本次构建和链接留出磁盘空间。
+      - name: 检查编译前的磁盘空间
+        shell: pwsh
+        run: |
+          Get-PSDrive -PSProvider FileSystem |
+            Format-Table Name, @{Name='Free GiB'; Expression={[math]::Round($_.Free / 1GB, 1)}}
 
       - name: 编译 codex.exe
         shell: bash
