@@ -65,7 +65,8 @@
     "Failed to archive current thread: {error}": "归档当前线程失败：{error}",
     "A thread must start before it can be deleted.": "线程开始后才能删除。",
     "'/delete' is unavailable in side conversations. Press Ctrl+C to return to the main thread first.": "旁路对话中无法使用「/delete」，请先按 Ctrl+C 返回主线程。",
-    "Failed to delete current thread: {err}": "删除当前线程失败：{err}"
+    "Failed to delete current thread: {err}": "删除当前线程失败：{err}",
+    "Could not open {original_path}: {error}": "无法打开 {original_path}：{error}"
   },
   "codex-rs/tui/src/app/config_persistence.rs": {
     "Failed to set permission profile `{profile_id}`: {err}": "设置权限配置 `{profile_id}` 失败：{err}",

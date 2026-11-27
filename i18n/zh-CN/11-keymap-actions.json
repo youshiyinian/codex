@@ -160,6 +160,8 @@
     "Accept the current list selection.": "确认当前选择。",
     "Cancel and close selection views.": "取消并关闭选择视图。",
     "Agents": "智能体",
+    "Select the first task in the next group.": "选择下一分组中的第一个任务。",
+    "Select the first task in the previous group.": "选择上一分组中的第一个任务。",
     "Open the session resume picker.": "打开会话恢复列表。",
     "Search the available agent tasks.": "搜索可用的智能体任务。",
     "Open a new session in the selected checkout.": "在所选检出目录中打开新会话。",

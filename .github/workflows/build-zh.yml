@@ -18,6 +18,7 @@ on:
     branches: [zh-cn]
     paths:
       - "i18n/**"
+      - "!i18n/test_*.py"
       - ".github/workflows/build-zh.yml"
 
 permissions:
