@@ -1,0 +1,107 @@
+{
+  "_说明": "Windows 沙箱设置提示、0.172.0 新增界面（线程链接、侧边栏文件错误、任务快捷键帮助、异步提问、斜杠参数补全、只读/锁定对话提示）",
+  "codex-rs/tui/src/chatwidget/windows_sandbox_prompts.rs": {
+    "Set up the Codex agent sandbox to protect your files and control network access. Learn more <https://developers.openai.com/codex/windows>": "设置 Codex 智能体沙箱以保护你的文件并控制网络访问。了解更多 <https://developers.openai.com/codex/windows>",
+    "Your organization requires the default Codex agent sandbox to continue. Set it up to protect your files and control network access.": "你的组织要求先启用默认的 Codex 智能体沙箱才能继续。请设置沙箱以保护你的文件并控制网络访问。",
+    "Learn more <https://developers.openai.com/codex/windows>": "了解更多 <https://developers.openai.com/codex/windows>",
+    "Set up default sandbox (requires Administrator permissions)": "设置默认沙箱（需要管理员权限）",
+    "Use non-admin sandbox (higher risk if prompt injected)": "使用非管理员沙箱（遭遇提示词注入时风险更高）",
+    "Quit": "退出",
+    "Couldn't set up your sandbox with Administrator permissions": "无法使用管理员权限设置沙箱",
+    "You can still use Codex in a non-admin sandbox. It carries greater risk if prompt injected.": "你仍可在非管理员沙箱中使用 Codex，但在遭遇提示词注入时风险更高。",
+    "Your organization requires the default sandbox before Codex can continue.": "你的组织要求先设置默认沙箱，Codex 才能继续运行。",
+    "Try setting up admin sandbox again": "重试设置管理员沙箱",
+    "Use Codex with non-admin sandbox": "使用非管理员沙箱运行 Codex",
+    "Input disabled until setup completes.": "设置完成前暂不可输入。",
+    "Setting up sandbox...": "正在设置沙箱...",
+    "Hang tight, this may take a few minutes": "请稍候，这可能需要几分钟"
+  },
+  "codex-rs/tui/src/app/thread_links.rs": {
+    "Invalid linked thread ancestry.": "链接的线程层级无效。",
+    "Linked conversation is unavailable: {error}": "链接的对话不可用：{error}",
+    "This conversation has no saved transcript.": "此对话没有已保存的对话记录。",
+    "Invalid linked thread parent: {error}": "链接的父线程无效：{error}",
+    "Linked agent {ancestor} is unavailable.": "链接的智能体 {ancestor} 不可用。",
+    "Linked agent is unavailable: {error}": "链接的智能体不可用：{error}"
+  },
+  "codex-rs/tui/src/app/archived_thread.rs": {
+    "Failed to reopen agent: {error}": "重新打开智能体失败：{error}"
+  },
+  "codex-rs/tui/src/app/sidebar_document/open_error.rs": {
+    "File not found": "未找到文件",
+    "This file may have moved since the link was added.": "添加链接后，此文件可能已被移动。",
+    "Check your read access, then reopen the link.": "请检查读取权限，然后重新打开链接。",
+    "Could not open file": "无法打开文件",
+    "in {directory}": "位于 {directory}"
+  },
+  "codex-rs/tui/src/app/agent_center/hints.rs": {
+    "Navigate": "导航",
+    "Up": "上移",
+    "Down": "下移",
+    "Open": "打开",
+    "Page up": "上一页",
+    "Page down": "下一页",
+    "Next group": "下一分组",
+    "Previous group": "上一分组",
+    "Quit": "退出",
+    "Tasks": "任务",
+    "New": "新建",
+    "New worktree": "新建 worktree",
+    "Resume": "恢复",
+    "Fork": "分叉",
+    "Rename": "重命名",
+    "Stop": "停止",
+    "Archive": "归档",
+    "Hide": "隐藏",
+    "Delete": "删除",
+    "Pin/unpin": "置顶/取消置顶",
+    "View": "视图",
+    "Filter": "筛选",
+    "Search": "搜索",
+    "Group": "分组",
+    "Task shortcuts": "任务快捷键",
+    "help": "帮助",
+    "back": "返回",
+    "move": "移动",
+    "open": "打开",
+    "new": "新建"
+  },
+  "codex-rs/tui/src/bottom_pane/async_questions/state.rs": {
+    "Scroll to read the entire option": "滚动以阅读完整选项",
+    "Answer too long; shorten it before sending": "回答过长，请精简后再发送"
+  },
+  "codex-rs/tui/src/bottom_pane/async_questions/render.rs": {
+    "skip": "跳过",
+    "prev question": "上一问题",
+    "main prompt": "主输入框",
+    "next question": "下一问题",
+    "queued messages": "排队消息",
+    "option {}/{}": "选项 {}/{}"
+  },
+  "codex-rs/tui/src/bottom_pane/chat_composer/slash_argument.rs": {
+    "no matches": "无匹配项"
+  },
+  "codex-rs/tui/src/chatwidget/read_only.rs": {
+    "Close it there and press R to continue here.": "请在那里关闭它，然后按 R 在此继续。",
+    "Press U to unarchive this thread and continue here.": "按 U 取消归档此线程并在此继续。",
+    "retry": "重试",
+    "unarchive": "取消归档"
+  },
+  "codex-rs/tui/src/chatwidget/rendering.rs": {
+    "Continue in a new chat": "在新对话中继续",
+    "Configuration on {}": "{} 上的配置",
+    "This conversation is open in another app": "此对话已在其他应用中打开",
+    "This thread was archived": "此线程已归档",
+    " to {action}": " {action}",
+    "continue in new chat": "在新对话中继续",
+    "start fresh": "全新开始",
+    "fork": "分叉",
+    "command center": "指挥中心",
+    "other chats": "其他对话",
+    "exit": "退出",
+    "transcript": "对话记录",
+    "Forking conversation…": "正在分叉对话…",
+    " cycle": " 切换",
+    " change": " 更改"
+  }
+}

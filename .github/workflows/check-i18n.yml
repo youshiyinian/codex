@@ -1,0 +1,72 @@
+name: 校验中文翻译
+
+on:
+  pull_request:
+    branches: [zh-cn]
+    paths:
+      - "i18n/**"
+      - ".github/workflows/check-i18n.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要校验的官方版本标签（如 rust-v0.172.0），留空表示最新正式版"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-i18n-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-i18n:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - name: 检出汉化仓库
+        uses: actions/checkout@v4
+
+      - name: 运行 apply.py 单元测试
+        run: python3 -B -m unittest discover -s i18n -p "test_*.py" -v
+
+      - name: 获取官方正式版标签
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$(gh api repos/openai/codex/releases/latest --jq .tag_name)"
+          fi
+          echo "上游版本: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: 拉取官方源码
+        uses: actions/checkout@v4
+        with:
+          repository: openai/codex
+          ref: ${{ steps.upstream.outputs.tag }}
+          path: upstream
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 严格校验翻译表
+        run: |
+          set -euo pipefail
+          python3 -B i18n/apply.py upstream --check --strict | tee apply-report.txt
+          {
+            echo "### 翻译校验结果（${{ steps.upstream.outputs.tag }}）"
+            echo ""
+            echo '```text'
+            tail -n 50 apply-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

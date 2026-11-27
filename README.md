@@ -34,8 +34,9 @@ codex-update -Restore   # 恢复官方英文版
 ## 本地试用翻译
 
 ```bash
-git clone --depth 1 --branch rust-v0.166.0 https://github.com/openai/codex.git upstream
-python i18n/apply.py upstream
+git clone --depth 1 --branch rust-v0.172.0 https://github.com/openai/codex.git upstream
+python i18n/apply.py upstream --check --strict   # 仅校验词典与匹配情况，不改动源码
+python i18n/apply.py upstream                    # 实际将翻译写入 upstream 源码
 ```
 
 输出中的“警告: 未找到原文”表示官方改了那句英文，对应位置会显示英文，更新翻译表即可。

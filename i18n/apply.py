@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """把 i18n/zh-CN/*.json 中的中文翻译应用到 Codex 源码。
 
-用法: python i18n/apply.py <codex 源码根目录> [--strict]
+用法: python i18n/apply.py <codex 源码根目录> [--strict] [--dry-run|--check]
 
 翻译文件格式 (JSON):
 {
@@ -12,8 +12,9 @@
 规则:
 - 只替换“内容完全等于原文”的普通字符串字面量 "..."，不碰原始字符串 r"..."、字节串 b"..."、注释和字符字面量。
 - 原文和译文都按源码里的写法书写（转义保持原样，如 \\n）；译文不要出现英文双引号，用「」代替。
-- 原文和译文中的 {占位符} 必须一致，否则报错。
-- 官方新版本里找不到的原文只打印警告（说明该句已被官方改写），不会中断构建。
+- 原文和译文中的 {占位符} 必须一致，且不允许重复键，否则报错。
+- 官方新版本里找不到的原文只打印警告（说明该句已被官方改写），不会中断构建；加 --strict 时有未匹配翻译会返回非零退出码。
+- 加 --dry-run 或 --check 时仅校验与统计，不修改源码文件。
 """
 import json, os, re, sys, glob
 
@@ -24,8 +25,8 @@ PLACEHOLDER = re.compile(r"\{[^{}]*\}")
 def is_test_file(path):
     p = path.replace("\\", "/")
     name = os.path.basename(p)
-    return ("/tests/" in p or "/snapshots/" in p or name == "tests.rs"
-            or name.endswith("_tests.rs") or name.endswith("_test.rs")
+    return ("/tests/" in p or "_tests/" in p or "_test/" in p or "/snapshots/" in p
+            or name == "tests.rs" or name.endswith("_tests.rs") or name.endswith("_test.rs")
             or "test_support" in name)
 
 
@@ -111,6 +112,22 @@ def find_literals(src):
     return out
 
 
+def load_json_checked(path, errors):
+    """读取 JSON 并检测任意层级对象中的重复键。"""
+    name = os.path.basename(path)
+
+    def hook(pairs):
+        obj = {}
+        for k, v in pairs:
+            if k in obj:
+                errors.append(f"{name}: 重复的键: {k!r}")
+            obj[k] = v
+        return obj
+
+    with open(path, encoding="utf-8") as f:
+        return json.load(f, object_pairs_hook=hook)
+
+
 def main():
     # Windows 控制台默认编码不是 UTF-8，打印中文会报错
     for stream in (sys.stdout, sys.stderr):
@@ -118,26 +135,57 @@ def main():
             stream.reconfigure(encoding="utf-8")
         except Exception:
             pass
-    if len(sys.argv) < 2:
-        print(__doc__); sys.exit(2)
-    root = sys.argv[1]
-    strict = "--strict" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    flags = {a for a in sys.argv[1:] if a.startswith("-")}
+    unknown = flags - {"--strict", "--dry-run", "--check"}
+    if len(args) != 1 or unknown:
+        if unknown:
+            print(f"错误: 未知参数: {', '.join(sorted(unknown))}", file=sys.stderr)
+        print(__doc__)
+        sys.exit(2)
+    root = args[0]
+    if not os.path.isdir(root):
+        print(f"错误: 源码根目录不存在: {root}", file=sys.stderr)
+        sys.exit(2)
+    strict = "--strict" in flags
+    dry_run = "--dry-run" in flags or "--check" in flags
     here = os.path.dirname(os.path.abspath(__file__))
     table = {}
+    seen = {}
     errors = []
     for jf in sorted(glob.glob(os.path.join(here, "zh-CN", "*.json"))):
-        data = json.load(open(jf, encoding="utf-8"))
+        name = os.path.basename(jf)
+        try:
+            data = load_json_checked(jf, errors)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{name}: JSON 解析失败: {exc}")
+            continue
+        if not isinstance(data, dict):
+            errors.append(f"{name}: 顶层必须是 JSON 对象")
+            continue
         for scope, entries in data.items():
             if scope.startswith("_"):
                 continue
+            if not isinstance(entries, dict):
+                errors.append(f"{name}: 作用域 {scope!r} 的值必须是对象")
+                continue
+            norm_scope = scope[:-len("!force")] if scope.endswith("!force") else scope
             dst = table.setdefault(scope, {})
             for en, zh in entries.items():
+                if not isinstance(zh, str):
+                    errors.append(f"{name}: 译文必须是字符串: [{scope}] {en!r}")
+                    continue
+                key = (norm_scope, en)
+                if key in seen:
+                    errors.append(f"{name}: 与 {seen[key]} 存在重复翻译键: [{norm_scope}] {en!r}")
+                else:
+                    seen[key] = name
                 if sorted(PLACEHOLDER.findall(en)) != sorted(PLACEHOLDER.findall(zh)):
-                    errors.append(f"{os.path.basename(jf)}: 占位符不一致: {en!r} -> {zh!r}")
+                    errors.append(f"{name}: 占位符不一致: {en!r} -> {zh!r}")
                 if (en.count("(") != en.count(")")) and ("（" in zh or "）" in zh):
-                    errors.append(f"{os.path.basename(jf)}: 原文括号不成对，译文请用半角括号: {en!r} -> {zh!r}")
+                    errors.append(f"{name}: 原文括号不成对，译文请用半角括号: {en!r} -> {zh!r}")
                 if re.search(r'(?<!\\)"', zh):
-                    errors.append(f"{os.path.basename(jf)}: 译文含未转义的英文双引号: {zh!r}")
+                    errors.append(f"{name}: 译文含未转义的英文双引号: {zh!r}")
                 dst[en] = zh
     if errors:
         print("\n".join(errors)); sys.exit(1)
@@ -168,11 +216,15 @@ def main():
         if is_test_file(rel) and rel not in table:
             continue
         local = table.get(rel, {})
-        src = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
         lits = [(s_, e_, normalize(src[s_:e_])) for s_, e_ in find_literals(src)]
         # 同一文件中，只要某条原文有一处出现在比较/匹配位置（== != => starts_with 等），
         # 就整体跳过该原文，避免改坏程序逻辑。
-        m_test = re.search(r"#\[cfg\(test\)\]\s*\n\s*(pub(\(crate\))?\s+)?mod \w+\s*\{", src)
+        m_test = re.search(
+            r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\(crate\))?\s+)?mod\s+\w+\s*\{",
+            src,
+        )
         test_cut = m_test.start() if m_test else len(src)
         unsafe = {raw for s_, e_, raw in lits
                   if s_ < test_cut and in_logic_position(src, s_ - 1, e_ + 1)}
@@ -192,8 +244,10 @@ def main():
             pieces.append(src[last:s]); pieces.append(zh)
             last = e; count += 1
         if count:
-            pieces.append(src[last:])
-            open(path, "w", encoding="utf-8", newline="").write("".join(pieces))
+            if not dry_run:
+                pieces.append(src[last:])
+                with open(path, "w", encoding="utf-8", newline="") as f:
+                    f.write("".join(pieces))
             total += count
     stale = [(f, k) for f, ks in table.items() for k in ks if k not in used[f]]
     stale += [("*", k) for k in global_tbl if k not in used_global]
